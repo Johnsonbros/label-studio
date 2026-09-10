@@ -195,7 +195,7 @@ def conversation(text):
 def quarterly():
     from export_reviewed import export
     from export_reviewed import split_for
-    from tool_contracts import approved_traces
+    from tool_contracts import approved_traces,snapshot
     now = datetime.now(TZ)
     quarter = f'{now.year}-Q{(now.month-1)//3+1}'
     # First scheduled candidate: October 1, 2026; later quarters retry daily until ready.
@@ -203,6 +203,8 @@ def quarterly():
     with db() as c:
         old = c.execute('SELECT status FROM quarters WHERE quarter=?',(quarter,)).fetchone()
     if old and old[0] in ['queued','waiting_for_gpu','training','complete','failed','interrupted']: return
+    # Refresh before validating traces, including runs triggered by review webhooks.
+    if os.environ.get('PUBLIC_MCP_URL'):snapshot()
     native = api(f'/api/projects/{PROJECT}/export?exportType=JSON&download_all_tasks=true')
     directory = STATE / 'quarterly' / quarter
     directory.mkdir(exist_ok=True)
