@@ -1,5 +1,5 @@
 """Bounded QLoRA candidate training, with held-out loss; no model deployment."""
-import argparse,json,hashlib
+import argparse,json,hashlib,copy
 from pathlib import Path
 import torch
 from transformers import AutoTokenizer,AutoModelForCausalLM,BitsAndBytesConfig,Trainer,TrainingArguments
@@ -9,21 +9,33 @@ def load(path):
     rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
     if not rows:raise ValueError('Empty dataset')
     for r in rows:
-        if r.get('lane')!='cory_public' or r.get('channel')!='phone':raise ValueError('Wrong training lane')
+        if r.get('lane')!='cory_public' or r.get('channel') not in ['phone','phone_tool']:raise ValueError('Wrong training lane')
+        if r['channel']=='phone_tool':
+            from tool_contracts import validate_trace,contract_hash
+            if contract_hash(r['tools'])!=r['contract_version']:raise ValueError('Embedded tool definitions changed')
+            validate_trace(r,{'version':r['contract_version'],'tools':r['tools']})
         if r['messages'][-1]['role']!='assistant':raise ValueError('Missing assistant target')
     return rows
 
 def tokenize(tokenizer,rows):
     result=[]
     for row in rows:
-        messages=row['messages']
-        full=tokenizer.apply_chat_template(messages,tokenize=True,add_generation_prompt=False,enable_thinking=False)
-        prefix=tokenizer.apply_chat_template(messages[:-1],tokenize=True,add_generation_prompt=True,enable_thinking=False)
-        # Never invent a target when truncation removes the assistant reply.
-        if full[:len(prefix)]!=prefix or len(prefix)>=2048:continue
-        ids=full[:2048]
-        if len(ids)<=len(prefix):continue
-        result.append({'input_ids':ids,'attention_mask':[1]*len(ids),'labels':[-100]*len(prefix)+ids[len(prefix):]})
+        messages=copy.deepcopy(row['messages'])
+        for message in messages:
+            for call in message.get('tool_calls',[]):
+                args=call['function']['arguments']
+                if isinstance(args,str):call['function']['arguments']=json.loads(args)
+        kwargs={'tools':[{'type':'function','function':{'name':t['name'],'description':t.get('description',''),'parameters':t['inputSchema']}} for t in row['tools']]} if row.get('tools') else {}
+        # Supervise every assistant response, including tool calls, never tool results.
+        for index,message in enumerate(messages):
+            if message['role']!='assistant':continue
+            full=tokenizer.apply_chat_template(messages[:index+1],tokenize=True,add_generation_prompt=False,enable_thinking=False,**kwargs)
+            prefix=tokenizer.apply_chat_template(messages[:index],tokenize=True,add_generation_prompt=True,enable_thinking=False,**kwargs)
+            # Skip an overlength example rather than teaching a truncated tool call.
+            if full[:len(prefix)]!=prefix or len(full)>4096 or len(full)<=len(prefix):
+                if row.get('channel')=='phone_tool':raise ValueError('Tool trace exceeds context or has incompatible chat format')
+                continue
+            result.append({'input_ids':full,'attention_mask':[1]*len(full),'labels':[-100]*len(prefix)+full[len(prefix):]})
     if not result:raise ValueError('No valid supervised replies after tokenization')
     return result
 

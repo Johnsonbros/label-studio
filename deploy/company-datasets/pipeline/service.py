@@ -39,6 +39,7 @@ def init():
         CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
         CREATE TABLE IF NOT EXISTS quarters (quarter TEXT PRIMARY KEY, status TEXT,
           detail TEXT, updated REAL);
+        CREATE TABLE IF NOT EXISTS judgments (task_id INTEGER PRIMARY KEY, state TEXT, retry_at REAL DEFAULT 0);
         ''')
         c.execute("INSERT OR IGNORE INTO meta VALUES ('started', ?)", (str(time.time()),))
 
@@ -193,6 +194,8 @@ def conversation(text):
 
 def quarterly():
     from export_reviewed import export
+    from export_reviewed import split_for
+    from tool_contracts import approved_traces
     now = datetime.now(TZ)
     quarter = f'{now.year}-Q{(now.month-1)//3+1}'
     # First scheduled candidate: October 1, 2026; later quarters retry daily until ready.
@@ -206,7 +209,11 @@ def quarterly():
     raw = directory / 'native.json'
     raw.write_text(json.dumps(native))
     exported, manifest = export(raw, directory / 'reviewed')
+    version=meta('tool_contract_version')
+    if not version and (STATE/'tool-traces'/'approved.jsonl').exists():raise ValueError('No current MCP contract for tool traces')
+    tool_rows=approved_traces(STATE/'tool-traces',json.loads((STATE/'tools'/(version+'.json')).read_text())) if version else []
     counts = {'train':0,'eval':0}
+    tool_counts={'train':0,'eval':0}
     for split in counts:
         records = []
         for line in (exported / (split+'.jsonl')).read_text().splitlines():
@@ -215,23 +222,64 @@ def quarterly():
             if turns:
                 records.append({'lane':'cory_public','channel':'phone','source_id':row['source_id'],
                     'messages':[{'role':'system','content':'You are Cory, the Johnson Bros Plumbing phone receptionist. Help customers with plumbing service requests. Never claim an action was completed unless a tool confirmed it.'}]+turns})
-        (directory / (split+'.jsonl')).write_text(''.join(json.dumps(r)+'\n' for r in records))
         counts[split] = len(records)
+        selected=[r for r in tool_rows if split_for(r['source_id'],10)==split]
+        tool_counts[split]=len(selected)
+        records.extend(selected)
+        (directory / (split+'.jsonl')).write_text(''.join(json.dumps(r)+'\n' for r in records))
     enough = counts['train'] >= 100 and counts['eval'] >= 10
     status = 'queued' if enough else 'waiting_for_reviewed_calls'
-    job = {'quarter':quarter,'status':status,'counts':counts,'base_model':os.environ.get('TRAIN_BASE_MODEL','Qwen/Qwen3-8B'),
-           'auto_promote':False,'created_at':now.isoformat(), 'data_sha256':hashlib.sha256((directory/'train.jsonl').read_bytes()).hexdigest()}
+    job = {'quarter':quarter,'status':status,'counts':counts,'tool_counts':tool_counts,'tool_contract_version':version,'base_model':os.environ.get('TRAIN_BASE_MODEL','Qwen/Qwen3-8B'),
+           'auto_promote':False,'created_at':now.isoformat(), 'eval_sha256':hashlib.sha256((directory/'eval.jsonl').read_bytes()).hexdigest(), 'data_sha256':hashlib.sha256((directory/'train.jsonl').read_bytes()).hexdigest()}
     temp = directory / 'job.tmp';temp.write_text(json.dumps(job,indent=2));temp.replace(directory/'job.json')
     with db() as c: c.execute('INSERT OR REPLACE INTO quarters VALUES (?,?,?,?)',(quarter,status,json.dumps(counts),time.time()))
 
 def refresh_review():
-    from export_reviewed import accepted, reviewed_text
+    from export_reviewed import accepted, reviewed_text, positive_quality, text_field
+    from export_curated import curate
     rows=api(f'/api/projects/{PROJECT}/export?exportType=JSON&download_all_tasks=true')
-    approved=0
+    approved=0;positive=0
     for row in rows:
         annotations=[a for a in row.get('annotations',[]) if accepted(a)]
-        if len(annotations)==1 and reviewed_text(annotations[0]):approved+=1
-    meta('review_summary',json.dumps({'tasks':len(rows),'approved_redacted':approved,'checked_at':datetime.now(TZ).isoformat()}))
+        if len(annotations)==1 and reviewed_text(annotations[0]):
+            approved+=1
+            if positive_quality(annotations[0]) and text_field(annotations[0],'training_excerpt'):positive+=1
+    curated=curate(rows,STATE/'curated',{'hcp':ARCHIVE,'daily':STATE/'media'})
+    meta('review_summary',json.dumps({'tasks':len(rows),'approved_redacted':approved,'positive_quality_examples':positive,
+           'preference_pairs':curated['preference_pairs'],'clips':curated['clips'],'checked_at':datetime.now(TZ).isoformat()}))
+
+def refresh_knowledge():
+    try:
+        from knowledge import sync_knowledge
+        sync_knowledge()
+        meta('knowledge_error','')
+    except Exception as e:
+        meta('knowledge_error',type(e).__name__)
+
+def score_next():
+    from ml_backend import predict_task,VERSION,LOCK
+    day=datetime.now(TZ).date().isoformat()
+    if meta('score_day')!=day:meta('score_day',day);meta('scored_today',0)
+    count=int(meta('scored_today') or 0)
+    if count>=int(os.environ.get('DAILY_QUALITY_LIMIT','10')):return
+    with db() as c:done={r['task_id']:dict(r) for r in c.execute('SELECT * FROM judgments')}
+    for task in tasks():
+        old=done.get(task['id'])
+        if old and (old['state']=='scored' or old['retry_at']>time.time()):continue
+        if not LOCK.acquire(blocking=False):return
+        try:
+            existing=api(f"/api/predictions/?task={task['id']}")
+            if not any(p.get('model_version')==VERSION for p in existing):
+                prediction=predict_task(task)
+                if not any(r['from_name']=='quality_score' for r in prediction['result']):raise ValueError('No grounded score')
+                api('/api/predictions/','POST',{'task':task['id'],**prediction})
+            with db() as c:c.execute('INSERT OR REPLACE INTO judgments VALUES (?,?,?)',(task['id'],'scored',0))
+            meta('scored_today',count+1)
+        except Exception as e:
+            with db() as c:c.execute('INSERT OR REPLACE INTO judgments VALUES (?,?,?)',(task['id'],'retry',time.time()+3600))
+            meta('judge_last_error',type(e).__name__)
+        finally:LOCK.release()
+        return
 
 def work():
     while not STOP.is_set():
@@ -241,6 +289,7 @@ def work():
             requested=meta('review_requested')
             if requested and requested!=meta('review_processed') and time.time()-float(requested)>5:
                 refresh_review()
+                refresh_knowledge()
                 quarterly()
                 meta('review_processed',requested)
             if meta('last_daily') != day:
@@ -252,6 +301,12 @@ def work():
                     meta('poll_error',type(e).__name__)
                 quarterly()
                 refresh_review()
+                from tool_contracts import snapshot
+                refresh_knowledge()
+                try:
+                    snapshot()
+                    meta('tool_contract_error','')
+                except Exception as e:meta('tool_contract_error',type(e).__name__)
                 meta('last_daily',day)
                 with db() as source, sqlite3.connect(STATE / 'pipeline-backup.sqlite') as target:
                     source.backup(target)
@@ -265,6 +320,8 @@ def work():
                     with db() as c:
                         c.execute('UPDATE recordings SET attempts=attempts+1,retry_at=?,error=? WHERE id=?',
                             (time.time()+min(86400,60*2**min(row['attempts'],10)),type(e).__name__,row['id']))
+            else:
+                score_next()
             meta('heartbeat',time.time())
             meta('worker_error','')
         except Exception as e:
@@ -279,6 +336,19 @@ async def lifespan(app):
     STOP.set()
 
 app = FastAPI(lifespan=lifespan,docs_url=None,redoc_url=None,openapi_url=None)
+
+@app.post('/knowledge/search')
+async def knowledge_search(request:Request):
+    expected='Bearer '+os.environ['KNOWLEDGE_READ_TOKEN']
+    if not hmac.compare_digest(request.headers.get('Authorization',''),expected):raise HTTPException(403)
+    state=json.loads(meta('knowledge_status') or '{}')
+    if meta('knowledge_error') or time.time()-state.get('checked_at',0)>26*3600:raise HTTPException(503,'Knowledge review sync is unavailable or stale')
+    data=await request.json()
+    from knowledge import search
+    from starlette.concurrency import run_in_threadpool
+    try:results=await run_in_threadpool(search,data.get('query',''),data.get('limit',5))
+    except (ValueError,TypeError):raise HTTPException(400,'Invalid query')
+    return {'results':results,'scope':'approved_public_company_facts','answer_if_empty':'No verified fact found; use the approved live business tools or staff handoff.'}
 
 @app.post('/webhooks/label-studio')
 async def label_webhook(request:Request):
@@ -322,7 +392,10 @@ def status(request:Request):
         quarters = [dict(r) for r in c.execute('SELECT * FROM quarters')]
     return {'recordings':counts,'retrying_or_excluded':errors,'last_daily':meta('last_daily'),
             'heartbeat':meta('heartbeat'),'worker_error':meta('worker_error'),'poll_error':meta('poll_error'),
-            'review':meta('review_summary'),'last_label_event':meta('last_label_event'),'quarters':quarters}
+            'review':meta('review_summary'),'last_label_event':meta('last_label_event'),'quarters':quarters,
+            'quality':{'scored_today':meta('scored_today'),'last_error':meta('judge_last_error')},
+            'knowledge':{'status':meta('knowledge_status'),'last_error':meta('knowledge_error'),'live_cory_connected':False},
+            'tools':{'contract_version':meta('tool_contract_version'),'count':meta('tool_contract_count'),'changed':meta('tool_contract_changed'),'last_error':meta('tool_contract_error')}}
 
 from ml_backend import router as ml_router
 app.include_router(ml_router,prefix='/ml')

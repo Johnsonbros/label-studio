@@ -39,6 +39,24 @@ def reviewed_text(annotation):
     text = "\n".join(parts).strip()
     return text or None
 
+def text_field(annotation, name):
+    values=[r.get('value',{}).get('text') for r in annotation.get('result',[]) if r.get('from_name')==name and r.get('type')=='textarea']
+    if len(values)!=1 or not isinstance(values[0],list) or not all(isinstance(x,str) for x in values[0]):return None
+    return '\n'.join(values[0]).strip() or None
+
+def number_field(annotation, name):
+    values=[r.get('value',{}).get('number') for r in annotation.get('result',[]) if r.get('from_name')==name and r.get('type')=='number']
+    if len(values)!=1 or isinstance(values[0],bool) or not isinstance(values[0],(int,float)):return None
+    import math
+    return values[0] if math.isfinite(values[0]) else None
+
+def positive_quality(annotation):
+    score=number_field(annotation,'quality_score')
+    return (choices(annotation,'training_use')==['positive_example']
+            and choices(annotation,'quality_review')==['human_confirmed']
+            and choices(annotation,'critical_failures')==['none']
+            and score is not None and 80<=score<=100)
+
 def split_for(source_id, eval_percent):
     return "eval" if int(digest(source_id.encode()), 16) % 100 < eval_percent else "train"
 
@@ -72,8 +90,16 @@ def export(source, output_root, eval_percent=10):
         if text is None:
             counts["missing_reviewed_transcript"] += 1
             continue
+        if not positive_quality(approved[0]):
+            counts['not_positive_quality_reviewed'] += 1
+            continue
+        excerpt=text_field(approved[0],'training_excerpt')
+        if not excerpt:
+            counts['missing_training_excerpt'] += 1
+            continue
         pending.append({"source_id": source_id.strip(), "task_id": task.get("id"),
-                        "annotation_id": approved[0].get("id"), "text": text,
+                        "annotation_id": approved[0].get("id"), "text": excerpt,
+                        "quality_score":number_field(approved[0],'quality_score'),
                         "disposition": "approved", "privacy_review": "redacted",
                         "artifact_type": "reviewed_transcript"})
     frequencies = Counter(row["source_id"] for row in pending)

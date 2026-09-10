@@ -1,0 +1,73 @@
+<View>
+  <Header value="Private phone-call review"/>
+  <Header value="Listen, correct the draft, and label speaker turns. Replace customer identifiers with placeholders before marking privacy as redacted. Approve only after human review; this does not grant permission to clone a voice."/>
+  <Audio name="audio" value="$audio"/>
+  <Labels name="speaker" toName="audio">
+    <Label value="staff" background="#2563eb"/>
+    <Label value="customer" background="#16a34a"/>
+    <Label value="other" background="#9333ea"/>
+    <Label value="unknown" background="#64748b"/>
+    <Label value="overlap" background="#dc2626"/>
+    <Label value="non_speech" background="#d97706"/>
+  </Labels>
+  <Header value="Accurate whole-call transcript — correct recognition errors, not what actually happened"/>
+  <TextArea name="transcript" toName="audio" value="$draft_transcript"
+    editable="true" transcription="true" rows="10" maxSubmissions="1" required="true"/>
+  <Header value="Optional segment transcript (select a speaker region first)"/>
+  <TextArea name="segment_transcript" toName="audio" perRegion="true"
+    editable="true" rows="3" maxSubmissions="1"/>
+  <Header value="Training purpose — a lost booking does not automatically mean poor service"/>
+  <Choices name="training_use" toName="audio" choice="single-radio" required="true">
+    <Choice value="positive_example"/>
+    <Choice value="preference_pair"/>
+    <Choice value="exclude"/>
+  </Choices>
+  <Header value="Transcript score: accuracy 25, listening 20, professionalism 20, next step 25, efficiency 10. AI scores are suggestions."/>
+  <Number name="quality_score" toName="audio" min="0" max="100" step="1"/>
+  <Choices name="quality_review" toName="audio" choice="single-radio" required="true">
+    <Choice value="pending"/>
+    <Choice value="human_confirmed"/>
+  </Choices>
+  <Header value="Critical failures — select none only when no critical failure applies"/>
+  <Choices name="critical_failures" toName="audio" choice="multiple">
+    <Choice value="none"/>
+    <Choice value="unsafe_advice"/>
+    <Choice value="invented_booking_or_action"/>
+    <Choice value="unsupported_price_or_promise"/>
+    <Choice value="privacy_problem"/>
+  </Choices>
+  <Header value="Score evidence and reasoning — check quoted lines and timestamps against the recording"/>
+  <TextArea name="score_evidence" toName="audio" editable="true" rows="5" maxSubmissions="1"/>
+  <Header value="Audio delivery: interruptions, pace and tone require listening"/>
+  <Choices name="audio_delivery" toName="audio" choice="single-radio">
+    <Choice value="not_reviewed"/><Choice value="good"/><Choice value="needs_improvement"/>
+  </Choices>
+  <Header value="Observed outcome — separate from technique and never inferred from booking claims alone"/>
+  <Choices name="call_outcome" toName="audio" choice="single-radio">
+    <Choice value="booking_confirmed"/><Choice value="followup_agreed"/>
+    <Choice value="resolved_without_booking"/><Choice value="lost_or_unresolved"/><Choice value="unknown"/>
+  </Choices>
+  <Header value="Positive example: copy only the useful, accurately transcribed CUSTOMER: / STAFF: exchange below. Omit poor technique and private details."/>
+  <TextArea name="training_excerpt" toName="audio" editable="true" rows="6" maxSubmissions="1"/>
+  <Header value="Optional audio clip: enter BOTH start and end seconds. Export makes a separate WAV and leaves the original intact. Text redaction does not redact audio."/>
+  <Number name="clip_start" toName="audio" min="0" step="0.01"/>
+  <Number name="clip_end" toName="audio" min="0" step="0.01"/>
+  <Header value="Negative example: same customer context, actual poor reply, and the better reply Cory should prefer. Better reply is a rewrite, not a transcript correction."/>
+  <TextArea name="preference_context" toName="audio" editable="true" rows="4" maxSubmissions="1"/>
+  <TextArea name="rejected_reply" toName="audio" editable="true" rows="3" maxSubmissions="1"/>
+  <TextArea name="chosen_reply" toName="audio" editable="true" rows="3" maxSubmissions="1"/>
+  <TextArea name="preference_reason" toName="audio" editable="true" rows="3" maxSubmissions="1"/>
+  <Header value="Human review disposition (approval is never automatic)"/>
+  <Choices name="disposition" toName="audio" choice="single-radio" required="true">
+    <Choice value="needs_work"/>
+    <Choice value="approved"/>
+    <Choice value="rejected"/>
+  </Choices>
+  <Header value="Privacy review of corrected text (original audio remains private and unredacted)"/>
+  <Choices name="privacy_review" toName="audio" choice="single-radio" required="true">
+    <Choice value="pending"/>
+    <Choice value="redacted"/>
+  </Choices>
+  <Header value="Quality notes: transcription errors, noise, uncertain speaker, or corrections needed"/>
+  <TextArea name="quality_notes" toName="audio" editable="true" rows="3" maxSubmissions="1"/>
+</View>

@@ -27,6 +27,8 @@ def process(path):
     data=path.parent/'train.jsonl';evaluation=path.parent/'eval.jsonl'
     if hashlib.sha256(data.read_bytes()).hexdigest()!=job['data_sha256']:
         set_status(job,path,'failed','Dataset hash mismatch');return
+    if hashlib.sha256(evaluation.read_bytes()).hexdigest()!=job.get('eval_sha256'):
+        set_status(job,path,'failed','Evaluation dataset hash mismatch');return
     output=ROOT/'models'/job['quarter'];output.mkdir(parents=True,exist_ok=True)
     set_status(job,path,'training')
     with (output/'training.log').open('a') as log:

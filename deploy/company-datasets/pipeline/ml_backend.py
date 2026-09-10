@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter,Depends,HTTPException,Request
 from preannotate import ROLE_PROMPT,ROLE_SCHEMA,build_result
 
-VERSION='cory-qwen35-9b-labels-v1'
+VERSION='cory-qwen35-9b-quality-v2'
 LOCK=threading.Lock()
 
 def auth(request:Request):
@@ -62,7 +62,10 @@ def predict_task(task):
             values=json.loads(r.json()['message']['content']).get('labels',[])
             found={x['i']:x['speaker'] for x in values if isinstance(x,dict) and isinstance(x.get('i'),int) and x.get('speaker') in ['staff','customer','unknown','other']}
             labels.extend(found.get(i,'unknown') for i in range(len(chunk)))
-    prediction={'model_version':VERSION,'score':0.5,'result':build_result(segments,labels)}
+    from quality_judge import judge,prediction_fields
+    with httpx.Client(timeout=60) as client:
+        judgment=judge(client,segments)
+    prediction={'model_version':VERSION,'score':0.5,'result':build_result(segments,labels)+prediction_fields(judgment)}
     path.write_text(json.dumps(prediction));return prediction
 
 @router.post('/predict')

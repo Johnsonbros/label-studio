@@ -12,6 +12,11 @@ def annotation():
     return {"id": 10, "result": [
         {"from_name": "disposition", "type": "choices", "value": {"choices": ["approved"]}},
         {"from_name": "privacy_review", "type": "choices", "value": {"choices": ["redacted"]}},
+        {"from_name":"training_use","type":"choices","value":{"choices":["positive_example"]}},
+        {"from_name":"quality_review","type":"choices","value":{"choices":["human_confirmed"]}},
+        {"from_name":"critical_failures","type":"choices","value":{"choices":["none"]}},
+        {"from_name":"quality_score","type":"number","value":{"number":90}},
+        {"from_name":"training_excerpt","type":"textarea","value":{"text":["Corrected synthetic text."]}},
         {"from_name": "transcript", "type": "textarea", "value": {"text": ["Corrected synthetic text."]}}
     ]}
 
@@ -63,6 +68,14 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(manifest["exported_count"], 0)
         self.assertEqual(manifest["skipped_counts"]["duplicate_source_id"], 2)
 
+    def test_negative_and_unconfirmed_quality_never_enter_sft(self):
+        samples=[task(str(i)) for i in range(3)]
+        samples[0]['annotations'][0]['result'][2]['value']['choices']=['preference_pair']
+        samples[1]['annotations'][0]['result'][3]['value']['choices']=['pending']
+        samples[2]['annotations'][0]['result'][4]['value']['choices']=['unsafe_advice']
+        _,manifest=self.run_export(samples)
+        self.assertEqual(manifest['exported_count'],0)
+
     def test_split_stable_across_order_and_disjoint(self):
         samples = [task("synthetic-" + str(i)) for i in range(100)]
         a, _ = self.run_export(samples)
@@ -82,10 +95,12 @@ class ExportTests(unittest.TestCase):
             with sqlite3.connect(source) as connection:
                 connection.execute("CREATE TABLE synthetic (value INTEGER)")
                 connection.execute("INSERT INTO synthetic VALUES (42)")
+            connection.close()
             target = backup(root)
             self.assertTrue(source.exists())
             with sqlite3.connect(target / "label_studio.sqlite3") as connection:
                 self.assertEqual(connection.execute("SELECT value FROM synthetic").fetchone(), (42,))
+            connection.close()
             self.assertTrue((target / "manifest.json").exists())
 
 if __name__ == "__main__":

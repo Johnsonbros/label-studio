@@ -1,0 +1,20 @@
+<View>
+  <Header value="Cory company knowledge — verify facts before publishing"/>
+  <Text name="proposal" value="$proposal"/>
+  <Header value="Approved wording: company information only. No customer records, credentials or internal operations."/>
+  <TextArea name="fact_text" toName="proposal" value="$proposal" rows="5" maxSubmissions="1" required="true"/>
+  <Header value="Graph relationship: subject, relation, object (example: Johnson Bros / serves / Quincy)"/>
+  <TextArea name="fact_subject" toName="proposal" rows="1" maxSubmissions="1" required="true"/>
+  <TextArea name="fact_relation" toName="proposal" rows="1" maxSubmissions="1" required="true"/>
+  <TextArea name="fact_object" toName="proposal" rows="2" maxSubmissions="1" required="true"/>
+  <Header value="Source URL — check the current policy or authoritative company source"/>
+  <TextArea name="fact_source" toName="proposal" value="$source_url" rows="2" maxSubmissions="1" required="true"/>
+  <Header value="Recheck after this many days (1–365). Expired facts stop appearing in search."/>
+  <Number name="review_interval_days" toName="proposal" min="1" max="365" step="1" required="true"/>
+  <Choices name="fact_visibility" toName="proposal" choice="single-radio" required="true">
+    <Choice value="public_company_information"/><Choice value="private_do_not_publish"/>
+  </Choices>
+  <Choices name="fact_review" toName="proposal" choice="single-radio" required="true">
+    <Choice value="needs_verification"/><Choice value="approved"/><Choice value="rejected"/>
+  </Choices>
+</View>
