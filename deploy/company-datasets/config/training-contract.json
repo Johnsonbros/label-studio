@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "taxonomy_file": "call-topic-taxonomy.v1.json",
+  "taxonomy_version": "1.0.0",
+  "sft_schema_file": "cory_sft_record.schema.json",
+  "sft_schema_sha256": "5f89f513420140eaf9012990dcd179ad8a9a80c35d11a2f54874dd71a466f39c",
+  "source_schema": "/mnt/nvme/appdata/cory-public-model/schemas/cory_sft_record.schema.json",
+  "status": "legacy_schema_pinned_not_tool_trace_complete",
+  "requires_existing_tool_trace_validator": true,
+  "consumer_adoption_pending": [
+    "judge",
+    "benchmark",
+    "gap_detector",
+    "trainer_metadata"
+  ]
+}

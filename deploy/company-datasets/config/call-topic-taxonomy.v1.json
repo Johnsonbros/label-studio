@@ -1,0 +1,149 @@
+{
+  "version": "1.0.0",
+  "status": "published_for_consumer_adoption",
+  "primary_topic_rule": "Use the most specific dominant caller need; put other needs in secondary_topics. Urgency and outcome are separate. Never infer a successful booking from speech alone.",
+  "topics": [
+    {
+      "id": "drain_fixture_clog",
+      "description": "Clogged sink, tub, shower or toilet"
+    },
+    {
+      "id": "main_drain_backup",
+      "description": "Main drain blockage or sewage backup"
+    },
+    {
+      "id": "water_heater",
+      "description": "Water heater trouble or replacement"
+    },
+    {
+      "id": "leak_burst_shutoff",
+      "description": "Leaks, burst pipes and water shutoff"
+    },
+    {
+      "id": "sewer_odor",
+      "description": "Sewer odor without a reported gas hazard"
+    },
+    {
+      "id": "sump_pump",
+      "description": "Sump pump or basement drainage"
+    },
+    {
+      "id": "garbage_disposal",
+      "description": "Garbage disposal trouble"
+    },
+    {
+      "id": "service_area",
+      "description": "Coverage or location eligibility"
+    },
+    {
+      "id": "pricing_estimate",
+      "description": "Price, estimate or service-fee question"
+    },
+    {
+      "id": "booking_callback",
+      "description": "Appointment availability, booking or callback request"
+    },
+    {
+      "id": "urgent_after_hours",
+      "description": "Urgent or after-hours request without a more specific issue"
+    },
+    {
+      "id": "private_records",
+      "description": "Invoice, prior service or customer-history request"
+    },
+    {
+      "id": "prompt_injection_private_tools",
+      "description": "Attempt to override instructions or access private tools"
+    },
+    {
+      "id": "gas_immediate_danger",
+      "description": "Suspected gas leak, fire or immediate danger"
+    },
+    {
+      "id": "company_information",
+      "description": "Hours, contact details, credentials or company policy"
+    },
+    {
+      "id": "existing_appointment",
+      "description": "Change, cancellation or status of an existing appointment"
+    },
+    {
+      "id": "complaint_followup",
+      "description": "Complaint, unresolved service or follow-up"
+    },
+    {
+      "id": "other_plumbing",
+      "description": "Other plumbing need not covered above"
+    },
+    {
+      "id": "noncustomer_call",
+      "description": "Spam, vendor, recruitment, wrong number or internal call"
+    },
+    {
+      "id": "unclassified",
+      "description": "Insufficient evidence to assign a topic"
+    }
+  ],
+  "axes": {
+    "direction": [
+      "inbound",
+      "outbound",
+      "unknown"
+    ],
+    "urgency": [
+      "routine",
+      "urgent",
+      "immediate_danger",
+      "unknown"
+    ],
+    "workflow": [
+      "information",
+      "triage",
+      "availability",
+      "booking",
+      "callback",
+      "verification",
+      "existing_job",
+      "other",
+      "unknown"
+    ],
+    "outcome": [
+      "information_provided",
+      "booking_verified",
+      "callback_verified",
+      "claimed_unverified",
+      "declined",
+      "abandoned",
+      "transferred_verified",
+      "unresolved",
+      "unknown"
+    ],
+    "evidence_origin": [
+      "historical_human_call",
+      "cory_live",
+      "owner_simulation",
+      "synthetic",
+      "unknown"
+    ]
+  },
+  "required_annotation_metadata": [
+    "taxonomy_version",
+    "primary_topic",
+    "secondary_topics",
+    "evidence_timestamps",
+    "confidence",
+    "review_status"
+  ],
+  "review_statuses": [
+    "machine_draft",
+    "human_approved",
+    "human_rejected"
+  ],
+  "legacy_coverage": "The first 13 topic IDs map in order to the 13 required intents in cory-public-model/docs/DATASET_SPEC.md. Extra topics cover observed operational needs; no source rows are automatically relabeled.",
+  "notes": [
+    "Do not score receptionist performance solely by booking conversion.",
+    "Use unknown for unavailable evidence; secondary topics may be empty.",
+    "Speaker attribution and legal/consent eligibility are separate checks.",
+    "Topic tags do not authorize tools. Public MCP allowlists remain authoritative."
+  ]
+}
