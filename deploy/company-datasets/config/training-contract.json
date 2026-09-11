@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "taxonomy_file": "call-topic-taxonomy.v1.json",
   "taxonomy_version": "1.0.0",
   "sft_schema_file": "cory_sft_record.schema.json",
@@ -12,5 +12,15 @@
     "benchmark",
     "gap_detector",
     "trainer_metadata"
-  ]
+  ],
+  "v2": {
+    "schema_file": "cory_sft_record.v2.schema.json",
+    "schema_sha256": "b71696ac75274c2e7df46453eaf825f67e8c3a2b5c74c9292c0fff62968085da",
+    "record_schema": "cory_sft_record/2.0",
+    "validator": "pipeline/sft_v2.py",
+    "trainer_image": "company-dataset-trainer:sft-v2-20260911",
+    "phone_loader_enforced": true,
+    "exporter_migration": "pending",
+    "reviewed_receipt_store": "/state/reviewed-tool-receipts"
+  }
 }
