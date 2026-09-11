@@ -4,10 +4,19 @@ from unittest.mock import patch
 import service
 import knowledge
 from quality_judge import LIMITS,validate_judgment,prediction_fields
-from tool_contracts import contract_hash,validate_trace,rpc_json,approved_traces
+from tool_contracts import contract_hash,validate_trace,rpc_json,approved_traces,compatibility_report
 import httpx
 
 class FoundationTests(unittest.TestCase):
+    def test_contract_compatibility_distinguishes_docs_from_schema_changes(self):
+        baseline={'version':'v1','tools':[{'name':'book','description':'Book','inputSchema':{'type':'object'}}]}
+        current=copy.deepcopy(baseline);current['version']='v2';current['tools'][0]['description']='Clearer booking instructions'
+        report=compatibility_report(baseline,current)
+        self.assertEqual(report['classification'],'existing_tool_shapes_preserved')
+        self.assertFalse(report['automatic_retraining'])
+        current['tools'][0]['inputSchema']['required']=['new_argument']
+        self.assertEqual(compatibility_report(baseline,current)['classification'],'compatibility_review_required')
+        self.assertEqual(compatibility_report(baseline,{'version':'v3','tools':[]})['removed_tools'],['book'])
     def test_judge_requires_grounded_evidence_for_every_score(self):
         raw={'scores':dict(LIMITS),'critical_flags':['unsafe_advice'],'confidence':'low',
              'evidence':[{'criterion':k,'quote':'Please explain the leak.','reason':'Example'} for k in LIMITS]}

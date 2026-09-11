@@ -1,0 +1,1292 @@
+{
+  "version": "7337cc2248e90e5b900b5b1d465834acaaaa968324cfe9969536a8ca8fedba27",
+  "tools": [
+    {
+      "name": "get_quote",
+      "title": "Get Plumbing Service Quote",
+      "description": "Use this when the user wants a non-binding estimate for a specific plumbing issue. Returns a price range, typical duration, and next step. Do not present the range as a guaranteed repair price; final pricing is confirmed on-site before work begins.\n\nWHEN TO USE: When a customer asks \"How much does it cost?\", \"What's the price?\", or wants to know pricing before booking. Use this early in the conversation to set expectations.\n\nPRICING NOTES:\n- Estimates are ranges; final price depends on on-site assessment\n- Do not invent urgency, after-hours, or commercial surcharges\n- The office or technician confirms any timing- or property-related pricing before work\n- The $99 service fee covers sending a technician out to diagnose the problem and give you an estimate before repair work starts. If you approve the repair, we waive the service fee and you pay only the price the technician quoted. If you decline the repair, the $99 service fee is due.\n\nWORKFLOW:\n1. Use this tool when customer asks about pricing\n2. Share the estimate with appropriate caveats\n3. If they want to proceed, use get_availability, request_booking, and confirm_booking\n\nRETURNS: Service name, price range (min/max in USD), estimated duration, urgency notes, and suggested next steps.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service_type": {
+            "type": "string",
+            "description": "Type of plumbing service (required). Examples: 'drain cleaning', 'water heater repair', 'toilet repair'"
+          },
+          "issue_description": {
+            "type": "string",
+            "description": "Description of the plumbing problem (required). Be specific about symptoms and location."
+          },
+          "property_type": {
+            "type": "string",
+            "enum": [
+              "residential",
+              "commercial"
+            ],
+            "description": "Type of property (default: 'residential')"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "routine",
+              "soon",
+              "urgent",
+              "emergency"
+            ],
+            "description": "How urgent is the repair?"
+          }
+        },
+        "required": [
+          "service_type",
+          "issue_description"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Get Price Estimate",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://widget/v2/quote.html"
+        },
+        "openai/outputTemplate": "ui://widget/v2/quote.html",
+        "openai/toolInvocation/invoking": "Calculating your estimate...",
+        "openai/toolInvocation/invoked": "Here's your instant estimate"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "service": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "estimated_price_range": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              },
+              "currency": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "min",
+              "max",
+              "currency"
+            ],
+            "additionalProperties": false
+          },
+          "estimated_duration": {
+            "type": "string"
+          },
+          "urgency_level": {
+            "type": "string"
+          },
+          "property_type": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "service_fee": {
+            "type": "string"
+          },
+          "next_steps": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "emergency_help",
+      "title": "Emergency Plumbing Help",
+      "description": "Use this immediately when the user describes an urgent plumbing safety or damage situation. Give bounded mitigation guidance and direct them to call Johnson Bros.; for gas, fire, or immediate danger, direct them to leave and call 911 first. Do not treat this tool as monitored emergency dispatch or create an online emergency appointment.\n\nWHEN TO USE: Immediately when a customer mentions an emergency situation like:\n- Burst pipe, flooding, or water damage\n- Gas smell or suspected gas leak (CRITICAL - may need to call 911)\n- Sewage backup or overflow\n- No water or sudden loss of water\n- Water heater leaking or not working\n\nPRIORITY ORDER:\n1. First ensure customer safety (especially for gas leaks)\n2. Provide immediate mitigation steps (how to shut off water, etc.)\n3. Then tell the user to call Johnson Bros. for emergency service\n\nRETURNS: Step-by-step immediate actions, safety warnings, things NOT to do, urgency level, and whether emergency dispatch is recommended.\n\nIMPORTANT: For gas leaks, always advise leaving the house and calling 911 first.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "emergency_type": {
+            "type": "string",
+            "description": "Type of plumbing emergency (required). Examples: 'burst pipe', 'flooding', 'gas leak', 'sewage backup', 'no hot water', 'no water'"
+          },
+          "additional_details": {
+            "type": "string",
+            "description": "Additional context about the emergency (optional). Include location, duration, actions already taken."
+          }
+        },
+        "required": [
+          "emergency_type"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Emergency Guidance",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://widget/v2/emergency.html"
+        },
+        "openai/outputTemplate": "ui://widget/v2/emergency.html",
+        "openai/toolInvocation/invoking": "Getting emergency guidance...",
+        "openai/toolInvocation/invoked": "Here's what to do right now"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "emergency_type": {
+            "type": "string"
+          },
+          "urgency_level": {
+            "type": "string"
+          },
+          "immediate_steps": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "safety_warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "emergency_contact": {
+            "type": "object",
+            "properties": {
+              "phone": {
+                "type": "string"
+              },
+              "available": {
+                "type": "string"
+              },
+              "response_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "phone",
+              "available",
+              "response_time"
+            ],
+            "additionalProperties": false
+          },
+          "call_now": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_availability",
+      "title": "Get Open Booking Windows",
+      "description": "Use this when the user wants live Johnson Bros. appointment availability. Returns customer-facing arrival windows and capacity only, never customer data. Do not use it to promise or create an appointment; use request_booking and confirm_booking for that.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 14,
+            "default": 7
+          },
+          "start_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "time_preference": {
+            "type": "string",
+            "enum": [
+              "any",
+              "morning",
+              "afternoon",
+              "evening"
+            ],
+            "default": "any"
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Check Open Booking Windows",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://widget/v2/availability.html"
+        },
+        "openai/outputTemplate": "ui://widget/v2/availability.html"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "requested_days": {
+            "type": "integer"
+          },
+          "time_preference": {
+            "type": "string",
+            "enum": [
+              "any",
+              "morning",
+              "afternoon",
+              "evening"
+            ]
+          },
+          "total_windows": {
+            "type": "integer"
+          },
+          "open_windows": {
+            "type": "integer"
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start_time": {
+                  "type": "string"
+                },
+                "end_time": {
+                  "type": "string"
+                },
+                "start_local": {
+                  "type": "string"
+                },
+                "end_local": {
+                  "type": "string"
+                },
+                "part_of_day": {
+                  "type": "string",
+                  "enum": [
+                    "morning",
+                    "afternoon",
+                    "evening"
+                  ]
+                },
+                "available": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "start_time",
+                "end_time",
+                "start_local",
+                "end_local",
+                "part_of_day",
+                "available"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "booking_flow": {
+            "type": "string"
+          },
+          "privacy": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "timezone",
+          "requested_days",
+          "time_preference",
+          "total_windows",
+          "open_windows",
+          "windows",
+          "booking_flow",
+          "privacy"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "check_service_area",
+      "title": "Check Service Area",
+      "description": "Use this when the user gives a Massachusetts ZIP code or town and wants to know whether Johnson Bros. serves it. Do not use this as proof that a specific appointment is available.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zip": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 10
+          },
+          "town": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 60
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Check Service Area",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "in_service_area": {
+            "type": "boolean"
+          },
+          "matched_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "zip",
+                  "town"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "zip": {
+            "type": "string"
+          },
+          "town": {
+            "type": "string"
+          },
+          "counties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "get_services_pricing",
+      "title": "Get Services & Pricing",
+      "description": "Use this when the user wants to browse Johnson Bros. services or general non-binding price ranges. Do not use it for an issue-specific estimate; use get_quote. Final pricing is confirmed on-site before work begins.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Filter by category: 'emergency', 'maintenance', 'repair', 'installation', 'specialty'"
+          },
+          "search": {
+            "type": "string",
+            "description": "Search term, e.g. \"water heater\", \"drain\""
+          }
+        },
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Services & Pricing",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://widget/v2/services.html"
+        },
+        "openai/outputTemplate": "ui://widget/v2/services.html"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "total_services": {
+            "type": "integer"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "price_range": {
+                  "type": "string"
+                },
+                "price_min": {
+                  "type": "number"
+                },
+                "price_max": {
+                  "type": "number"
+                },
+                "estimated_duration": {
+                  "type": "string"
+                },
+                "is_emergency": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "price_range",
+                "price_min",
+                "price_max",
+                "estimated_duration",
+                "is_emergency"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pricing_disclaimer": {
+            "type": "string"
+          },
+          "service_fee": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "total_services",
+          "services",
+          "categories",
+          "pricing_disclaimer",
+          "service_fee"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "business_info",
+      "title": "Get Business Information",
+      "description": "Use this when the user asks about Johnson Bros. contact details, credentials, hours, payment methods, service area, or booking process. Do not use it for live availability or a customer-specific record.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Business Information",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "business": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "legal_name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              },
+              "website": {
+                "type": "string"
+              },
+              "license": {
+                "type": "string"
+              },
+              "certifications": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "payment_methods": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "emergency": {
+                "type": "string"
+              },
+              "service_area": {
+                "type": "string"
+              },
+              "services_not_offered": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "name",
+              "legal_name",
+              "phone",
+              "email",
+              "website",
+              "license",
+              "certifications",
+              "payment_methods",
+              "emergency",
+              "service_area",
+              "services_not_offered"
+            ],
+            "additionalProperties": false
+          },
+          "hours": {
+            "type": "object",
+            "properties": {
+              "office": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "days": {
+                      "type": "string"
+                    },
+                    "opens": {
+                      "type": "string"
+                    },
+                    "closes": {
+                      "type": "string"
+                    },
+                    "note": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "days",
+                    "opens",
+                    "closes"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "sunday": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "office",
+              "sunday"
+            ],
+            "additionalProperties": false
+          },
+          "booking": {
+            "type": "object",
+            "properties": {
+              "how_agents_book": {
+                "type": "string"
+              },
+              "phone_booking": {
+                "type": "string"
+              },
+              "online_booking": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "how_agents_book",
+              "phone_booking",
+              "online_booking"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "success",
+          "business",
+          "hours",
+          "booking"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "request_callback",
+      "title": "Request a Johnson Bros. Callback",
+      "description": "Use this only after the user explicitly asks Johnson Bros. to call them about a plumbing need and provides their own contact details. This creates a callback lead, not an appointment. Do not use it for emergency dispatch; tell emergency users to call (617) 479-9911.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120,
+            "description": "Customer full name, for example \"Jane Smith\""
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 7,
+            "description": "Customer phone number for the callback"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "issue_description": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 2000,
+            "description": "Short description of the plumbing issue"
+          },
+          "preferred_callback_time": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Optional preference such as \"weekday morning\""
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "routine",
+              "soon",
+              "urgent"
+            ],
+            "default": "routine"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "description": "True only after the user explicitly asks Johnson Bros. to contact them"
+          }
+        },
+        "required": [
+          "name",
+          "phone",
+          "issue_description",
+          "confirmed"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Request Callback",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "callback_requested",
+              "rejected"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "phone_last4": {
+            "type": "string"
+          },
+          "next_step": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "message",
+          "next_step"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "request_booking",
+      "title": "Request a Booking (sends SMS confirmation code)",
+      "description": "Use this only after the user explicitly asks to start a Johnson Bros. booking and confirms their own contact details, service address, issue, and preferred windows. It sends a six-digit SMS code and does not schedule a visit. Do not claim an appointment exists until confirm_booking returns status:confirmed and booked:true.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 200,
+            "description": "Requested service, e.g. \"water heater replacement\""
+          },
+          "preferred_windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start_time": {
+                  "type": "string"
+                },
+                "end_time": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "start_time",
+                "end_time"
+              ],
+              "additionalProperties": false
+            },
+            "maxItems": 5,
+            "default": [],
+            "description": "Preferred arrival windows from get_availability (start_time/end_time ISO strings)"
+          },
+          "time_preference": {
+            "type": "string",
+            "enum": [
+              "any",
+              "morning",
+              "afternoon",
+              "evening"
+            ],
+            "default": "any",
+            "description": "Fallback time-of-day preference if none of the preferred windows is open"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120,
+            "description": "Customer full name"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 7,
+            "description": "Customer mobile number \u2014 receives the 6-digit confirmation code"
+          },
+          "address": {
+            "type": "object",
+            "properties": {
+              "street": {
+                "type": "string",
+                "minLength": 3
+              },
+              "unit": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string",
+                "minLength": 2
+              },
+              "state": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 2,
+                "default": "MA"
+              },
+              "zip": {
+                "type": "string",
+                "minLength": 5
+              }
+            },
+            "required": [
+              "street",
+              "city",
+              "zip"
+            ],
+            "additionalProperties": false
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Issue description / anything the technician should know"
+          },
+          "promotion_review_requested": {
+            "type": "boolean",
+            "default": false
+          },
+          "referral_code": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "confirmed": {
+            "type": "boolean",
+            "const": true,
+            "description": "True only after the user explicitly asks to start this booking request and send the SMS code"
+          }
+        },
+        "required": [
+          "service",
+          "name",
+          "phone",
+          "address",
+          "confirmed"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Request Booking",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "sandbox_verification_code": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending_sms_confirmation",
+              "rejected"
+            ]
+          },
+          "booking_id": {
+            "type": "string"
+          },
+          "code_sent_to": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string"
+          },
+          "attempts_allowed": {
+            "type": "integer"
+          },
+          "in_service_area": {
+            "type": "boolean"
+          },
+          "service_area_notice": {
+            "type": "string"
+          },
+          "next_step": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "next_step"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "confirm_booking",
+      "title": "Confirm a Booking with the SMS Code",
+      "description": "Use this after the customer supplies the six-digit SMS code from request_booking. Only status:confirmed with booked:true means the visit is scheduled. status:callback_pending with booked:false means the office must follow up and must never be described as an appointment. Replaying the same valid confirmation is safe and returns the stored result.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "booking_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": [
+          "booking_id",
+          "code"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Confirm Booking",
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "_meta": {
+        "ui": {
+          "resourceUri": "ui://widget/v2/booking-confirmation.html"
+        },
+        "openai/outputTemplate": "ui://widget/v2/booking-confirmation.html"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "review_sandbox": {
+            "type": "boolean"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "callback_pending",
+              "rejected"
+            ]
+          },
+          "booked": {
+            "type": "boolean"
+          },
+          "needs_manual": {
+            "type": "boolean"
+          },
+          "confirmation_number": {
+            "type": "string"
+          },
+          "customer_name": {
+            "type": "string"
+          },
+          "service_description": {
+            "type": "string"
+          },
+          "scheduled_start": {
+            "type": "string"
+          },
+          "scheduled_end": {
+            "type": "string"
+          },
+          "formatted_arrival_window": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "service_city": {
+            "type": "string"
+          },
+          "location_summary": {
+            "type": "string"
+          },
+          "business_phone": {
+            "type": "string"
+          },
+          "business_phone_href": {
+            "type": "string"
+          },
+          "replayed": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "next_step": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          },
+          "attempts_remaining": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "success",
+          "status",
+          "booked",
+          "needs_manual",
+          "business_phone",
+          "business_phone_href",
+          "message",
+          "next_step"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "search",
+      "title": "Search Johnson Bros. Knowledge",
+      "description": "Use this to find Johnson Bros. Plumbing pages about services, service area, pricing policy, or common questions. Returns ids, titles and URLs only -- call fetch with an id to read the full text. Do not use it to check live appointment availability (use get_availability) or to look up a customer.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Natural-language search terms, e.g. 'water heater Quincy'"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Search Johnson Bros. Knowledge",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Pass this to fetch to read the full document"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "success",
+          "results"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    },
+    {
+      "name": "fetch",
+      "title": "Fetch Johnson Bros. Document",
+      "description": "Use this to read the full text of a document returned by search. Takes the exact id from a search result. Returns public business information only -- it never returns customer records.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document id from a search result, e.g. 'faq:pricing-service-fee'"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      },
+      "annotations": {
+        "title": "Fetch Johnson Bros. Document",
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "execution": {
+        "taskSupport": "forbidden"
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "error": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "success"
+        ],
+        "additionalProperties": false,
+        "$schema": "http://json-schema.org/draft-07/schema#"
+      }
+    }
+  ]
+}

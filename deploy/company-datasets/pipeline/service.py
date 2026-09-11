@@ -397,7 +397,7 @@ def status(request:Request):
             'review':meta('review_summary'),'last_label_event':meta('last_label_event'),'quarters':quarters,
             'quality':{'scored_today':meta('scored_today'),'last_error':meta('judge_last_error')},
             'knowledge':{'status':meta('knowledge_status'),'last_error':meta('knowledge_error'),'live_cory_connected':meta('live_cory_connected')=='true'},
-            'tools':{'contract_version':meta('tool_contract_version'),'count':meta('tool_contract_count'),'changed':meta('tool_contract_changed'),'last_error':meta('tool_contract_error')}}
+            'tools':{'contract_version':meta('tool_contract_version'),'count':meta('tool_contract_count'),'changed':meta('tool_contract_changed'),'compatibility':meta('tool_compatibility'),'last_error':meta('tool_contract_error')}}
 
 from ml_backend import router as ml_router
 app.include_router(ml_router,prefix='/ml')
