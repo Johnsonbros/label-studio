@@ -264,10 +264,13 @@ def score_next():
     if meta('score_day')!=day:meta('score_day',day);meta('scored_today',0)
     count=int(meta('scored_today') or 0)
     if count>=int(os.environ.get('DAILY_QUALITY_LIMIT','10')):return
-    with db() as c:done={r['task_id']:dict(r) for r in c.execute('SELECT * FROM judgments')}
+    with db() as c:
+        done={r['task_id']:dict(r) for r in c.execute('SELECT * FROM judgments')}
+        has_grades=c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='call_quality_grades'").fetchone()
+        graded={r[0] for r in c.execute('SELECT task_id FROM call_quality_grades WHERE model_version=?',(VERSION,))} if has_grades else set()
     for task in tasks():
         old=done.get(task['id'])
-        if old and (old['state']=='scored' or old['retry_at']>time.time()):continue
+        if old and ((old['state']=='scored' and task['id'] in graded) or old['retry_at']>time.time()):continue
         if not LOCK.acquire(blocking=False):return
         try:
             existing=api(f"/api/predictions/?task={task['id']}")

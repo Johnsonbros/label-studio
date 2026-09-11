@@ -6,7 +6,7 @@ import httpx
 from fastapi import APIRouter,Depends,HTTPException,Request
 from preannotate import ROLE_PROMPT,ROLE_SCHEMA,build_result
 
-VERSION='cory-qwen35-9b-quality-v2'
+VERSION='cory-qwen35-9b-quality-topics-v3'
 LOCK=threading.Lock()
 
 def auth(request:Request):
@@ -25,11 +25,17 @@ def load_segments(task):
     from service import STATE,ARCHIVE
     data=task.get('data',{})
     audio=unquote(parse_qs(urlparse(data.get('audio','')).query).get('d',[''])[0])
-    if audio.startswith('hcp/'):
+    source=data.get('source_id','')
+    valid_source=isinstance(source,str) and len(source)==64 and all(c in '0123456789abcdef' for c in source)
+    batch=data.get('batch_id','')
+    import re
+    if data.get('pipeline')=='archive-pilot' and valid_source and isinstance(batch,str) and re.fullmatch(r'archive-pilot-[a-z0-9-]+',batch):
+        path=STATE/'pilots'/batch/(source+'.transcript.json')
+        if not path.resolve().is_relative_to((STATE/'pilots').resolve()):return []
+    elif audio.startswith('hcp/'):
         path=ARCHIVE/'transcripts'/(Path(audio).stem+'.json')
     else:
-        source=data.get('source_id','')
-        if len(source)!=64 or any(c not in '0123456789abcdef' for c in source):return []
+        if not valid_source:return []
         path=STATE/'transcripts'/(source+'.json')
     if path.is_symlink() or not path.is_file():return []
     raw=json.loads(path.read_text());raw=raw.get('whisper_response',raw)
@@ -44,7 +50,11 @@ def predict_task(task):
     cache=STATE/'predictions';cache.mkdir(exist_ok=True)
     key=hashlib.sha256((VERSION+json.dumps(segments,sort_keys=True)).encode()).hexdigest()
     path=cache/(key+'.json')
-    if path.exists():return json.loads(path.read_text())
+    grade_path=cache/(key+'.grade.json')
+    from topic_grading import persist
+    if path.exists() and grade_path.exists():
+        persist(task,json.loads(grade_path.read_text()),segments,VERSION)
+        return json.loads(path.read_text())
     labels=[];started=time.monotonic()
     with httpx.Client(timeout=25) as client:
         for offset in range(0,len(segments),12):
@@ -66,6 +76,8 @@ def predict_task(task):
     with httpx.Client(timeout=60) as client:
         judgment=judge(client,segments)
     prediction={'model_version':VERSION,'score':0.5,'result':build_result(segments,labels)+prediction_fields(judgment)}
+    persist(task,judgment,segments,VERSION)
+    grade_path.write_text(json.dumps(judgment))
     path.write_text(json.dumps(prediction));return prediction
 
 @router.post('/predict')
