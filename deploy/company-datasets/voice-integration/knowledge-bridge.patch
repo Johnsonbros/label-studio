@@ -1,0 +1,29 @@
+--- a/server.js
++++ b/server.js
+@@ -1172,6 +1172,7 @@
+       use_handoff_api: USE_CORY_HANDOFF_API,
+       answer_event_logs: ANSWER_EVENT_LOGS,
+       booking_enabled: VOICE_BOOKING_ENABLED,
++      company_knowledge_enabled: Boolean(process.env.COMPANY_KNOWLEDGE_URL && process.env.COMPANY_KNOWLEDGE_TOKEN),
+       booking_api: MCP_URL,
+       callback_api: MCP_URL,
+       booking_secret_set: Boolean(CORY_VOICE_INTERNAL_SECRET),
+@@ -1693,7 +1694,10 @@
+ // Exposed to the realtime LLM via session.update. The caller's phone number and
+ // the pending booking_id are bridge-injected, never model-supplied, so the model
+ // cannot book against an arbitrary phone or foreign booking.
++const companyKnowledge = require('./company-knowledge');
++const lookupCompanyKnowledge = companyKnowledge.createKnowledgeLookup({url:process.env.COMPANY_KNOWLEDGE_URL,token:process.env.COMPANY_KNOWLEDGE_TOKEN});
+ const VOICE_TOOL_DEFS = [
++  ...(process.env.COMPANY_KNOWLEDGE_URL && process.env.COMPANY_KNOWLEDGE_TOKEN ? [companyKnowledge.definition] : []),
+   ...require('./public-read-tools.json'),
+   { type: 'function', name: 'request_customer_verification', description: 'Send a customer-history verification code to this caller, only with explicit permission. Separate from booking verification.', parameters: { type: 'object', properties: { confirmed: { type: 'boolean', description: 'Caller explicitly agreed to receive the code' } }, required: ['confirmed'] } },
+   { type: 'function', name: 'verify_customer', description: 'Verify the customer-history SMS code and load previous conversations for the caller name. Use only the code the caller supplies.', parameters: { type: 'object', properties: { code: { type: 'string' }, first_name: { type: 'string' }, last_name: { type: 'string' } }, required: ['code','first_name','last_name'] } },
+@@ -1777,6 +1781,7 @@
+ ];
+ 
+ async function executeVoiceTool(name, args, sess, st) {
++  if (name === 'search_company_knowledge') return await lookupCompanyKnowledge(args);
+   if (['get_quote','emergency_help','get_services_pricing','business_info','search','fetch'].includes(name)) return await mcpCallTool(name, args);
+   if (name === 'request_customer_verification') {
+     if (args.confirmed !== true) return { success: false, error: 'Ask the caller for permission to text the verification code first.' };

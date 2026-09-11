@@ -66,9 +66,10 @@ Revoked vectors may remain stored but cannot pass the authoritative review filte
 Private `POST /knowledge/search` accepts `{ "query": "...", "limit": 5 }` and requires
 `Authorization: Bearer <KNOWLEDGE_READ_TOKEN>`. Failed or stale review synchronization
 returns 503. Do not expose this token or the private curator MCP to callers.
-The live Cory receptionist is not yet connected to this retrieval endpoint.
-Connect a narrowly scoped read-only tool after facts are approved and retrieval
-answer/citation tests pass. Availability, booking and customer-specific information
+The deployed Cory bridge now exposes the narrowly scoped `search_company_knowledge`
+tool; see `voice-integration/`. Twelve facts were verified against company pages;
+four proposals remain unapproved. Verification provenance identifies Codex as the
+reviewer, not a human. Availability, booking and customer-specific information
 must continue to use live operational tools.
 
 ## Tool-call training

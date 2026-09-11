@@ -396,7 +396,7 @@ def status(request:Request):
             'heartbeat':meta('heartbeat'),'worker_error':meta('worker_error'),'poll_error':meta('poll_error'),
             'review':meta('review_summary'),'last_label_event':meta('last_label_event'),'quarters':quarters,
             'quality':{'scored_today':meta('scored_today'),'last_error':meta('judge_last_error')},
-            'knowledge':{'status':meta('knowledge_status'),'last_error':meta('knowledge_error'),'live_cory_connected':False},
+            'knowledge':{'status':meta('knowledge_status'),'last_error':meta('knowledge_error'),'live_cory_connected':meta('live_cory_connected')=='true'},
             'tools':{'contract_version':meta('tool_contract_version'),'count':meta('tool_contract_count'),'changed':meta('tool_contract_changed'),'last_error':meta('tool_contract_error')}}
 
 from ml_backend import router as ml_router
