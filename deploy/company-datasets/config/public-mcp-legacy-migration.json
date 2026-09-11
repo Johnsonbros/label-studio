@@ -1,0 +1,698 @@
+{
+  "endpoint": "https://thejohnsonbros.com/mcp",
+  "tool_surface": "tjb_public_mcp",
+  "contract_version": "7337cc2248e90e5b900b5b1d465834acaaaa968324cfe9969536a8ca8fedba27",
+  "source": "Live MCP initialize and tools/list",
+  "scenarios": [
+    {
+      "source_file": "existing_customer\\booking_existing_customer_1.jsonl",
+      "source_sha256": "61e03ff31f2324deb0f9cb7c8ab7af60f29c796f6bf87a94cee624ddeb6f0fb4",
+      "legacy_functions": [
+        "find_customer_by_name_or_address",
+        "fetch_booking_windows",
+        "create_job"
+      ],
+      "replacement_steps": [
+        {
+          "tool": "check_service_area",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "zip": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 10
+              },
+              "town": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 60
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "get_availability",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 14,
+                "default": 7
+              },
+              "start_date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any"
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "request_booking",
+          "required_arguments": [
+            "service",
+            "name",
+            "phone",
+            "address",
+            "confirmed"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "service": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 200,
+                "description": "Requested service, e.g. \"water heater replacement\""
+              },
+              "preferred_windows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start_time": {
+                      "type": "string"
+                    },
+                    "end_time": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "start_time",
+                    "end_time"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 5,
+                "default": [],
+                "description": "Preferred arrival windows from get_availability (start_time/end_time ISO strings)"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any",
+                "description": "Fallback time-of-day preference if none of the preferred windows is open"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 120,
+                "description": "Customer full name"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 7,
+                "description": "Customer mobile number \u2014 receives the 6-digit confirmation code"
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "street": {
+                    "type": "string",
+                    "minLength": 3
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "state": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "default": "MA"
+                  },
+                  "zip": {
+                    "type": "string",
+                    "minLength": 5
+                  }
+                },
+                "required": [
+                  "street",
+                  "city",
+                  "zip"
+                ],
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 2000,
+                "description": "Issue description / anything the technician should know"
+              },
+              "promotion_review_requested": {
+                "type": "boolean",
+                "default": false
+              },
+              "referral_code": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "confirmed": {
+                "type": "boolean",
+                "const": true,
+                "description": "True only after the user explicitly asks to start this booking request and send the SMS code"
+              }
+            },
+            "required": [
+              "service",
+              "name",
+              "phone",
+              "address",
+              "confirmed"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "confirm_booking",
+          "required_arguments": [
+            "booking_id",
+            "code"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string",
+                "pattern": "^\\d{6}$"
+              }
+            },
+            "required": [
+              "booking_id",
+              "code"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        }
+      ],
+      "required_conversation_gates": [
+        "Ask for service issue and service location.",
+        "Use actual availability results and let the customer choose.",
+        "Collect name, phone and address directly; public MCP cannot retrieve private customer history.",
+        "Obtain explicit permission before request_booking and its SMS send.",
+        "Use booking_id from the actual request result, and only the code the caller supplies.",
+        "Only claim a confirmed appointment when the actual confirmation result has status=confirmed and booked=true."
+      ],
+      "review_status": "migration_plan_not_training_approved",
+      "executed": false,
+      "tool_results_invented": false
+    },
+    {
+      "source_file": "new_customer\\booking_new_customer_1.jsonl",
+      "source_sha256": "fe3b28b04d524c92f3fe7f470dcba71ca6c279331c49247557a4266d91838acb",
+      "legacy_functions": [
+        "create_customer",
+        "fetch_booking_windows",
+        "create_job"
+      ],
+      "replacement_steps": [
+        {
+          "tool": "check_service_area",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "zip": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 10
+              },
+              "town": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 60
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "get_availability",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 14,
+                "default": 7
+              },
+              "start_date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any"
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "request_booking",
+          "required_arguments": [
+            "service",
+            "name",
+            "phone",
+            "address",
+            "confirmed"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "service": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 200,
+                "description": "Requested service, e.g. \"water heater replacement\""
+              },
+              "preferred_windows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start_time": {
+                      "type": "string"
+                    },
+                    "end_time": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "start_time",
+                    "end_time"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 5,
+                "default": [],
+                "description": "Preferred arrival windows from get_availability (start_time/end_time ISO strings)"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any",
+                "description": "Fallback time-of-day preference if none of the preferred windows is open"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 120,
+                "description": "Customer full name"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 7,
+                "description": "Customer mobile number \u2014 receives the 6-digit confirmation code"
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "street": {
+                    "type": "string",
+                    "minLength": 3
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "state": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "default": "MA"
+                  },
+                  "zip": {
+                    "type": "string",
+                    "minLength": 5
+                  }
+                },
+                "required": [
+                  "street",
+                  "city",
+                  "zip"
+                ],
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 2000,
+                "description": "Issue description / anything the technician should know"
+              },
+              "promotion_review_requested": {
+                "type": "boolean",
+                "default": false
+              },
+              "referral_code": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "confirmed": {
+                "type": "boolean",
+                "const": true,
+                "description": "True only after the user explicitly asks to start this booking request and send the SMS code"
+              }
+            },
+            "required": [
+              "service",
+              "name",
+              "phone",
+              "address",
+              "confirmed"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "confirm_booking",
+          "required_arguments": [
+            "booking_id",
+            "code"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string",
+                "pattern": "^\\d{6}$"
+              }
+            },
+            "required": [
+              "booking_id",
+              "code"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        }
+      ],
+      "required_conversation_gates": [
+        "Ask for service issue and service location.",
+        "Use actual availability results and let the customer choose.",
+        "Collect name, phone and address directly; public MCP cannot retrieve private customer history.",
+        "Obtain explicit permission before request_booking and its SMS send.",
+        "Use booking_id from the actual request result, and only the code the caller supplies.",
+        "Only claim a confirmed appointment when the actual confirmation result has status=confirmed and booked=true."
+      ],
+      "review_status": "migration_plan_not_training_approved",
+      "executed": false,
+      "tool_results_invented": false
+    },
+    {
+      "source_file": "new_customer\\booking_new_customer_2.jsonl",
+      "source_sha256": "50b0711c4b72333468c85254bbd941248e208565c5573c33f83127ec727488e0",
+      "legacy_functions": [
+        "create_customer",
+        "fetchBookingWindows",
+        "create_job"
+      ],
+      "replacement_steps": [
+        {
+          "tool": "check_service_area",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "zip": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 10
+              },
+              "town": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 60
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "get_availability",
+          "required_arguments": [],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "days": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 14,
+                "default": 7
+              },
+              "start_date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any"
+              }
+            },
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "request_booking",
+          "required_arguments": [
+            "service",
+            "name",
+            "phone",
+            "address",
+            "confirmed"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "service": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 200,
+                "description": "Requested service, e.g. \"water heater replacement\""
+              },
+              "preferred_windows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start_time": {
+                      "type": "string"
+                    },
+                    "end_time": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "start_time",
+                    "end_time"
+                  ],
+                  "additionalProperties": false
+                },
+                "maxItems": 5,
+                "default": [],
+                "description": "Preferred arrival windows from get_availability (start_time/end_time ISO strings)"
+              },
+              "time_preference": {
+                "type": "string",
+                "enum": [
+                  "any",
+                  "morning",
+                  "afternoon",
+                  "evening"
+                ],
+                "default": "any",
+                "description": "Fallback time-of-day preference if none of the preferred windows is open"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 120,
+                "description": "Customer full name"
+              },
+              "phone": {
+                "type": "string",
+                "minLength": 7,
+                "description": "Customer mobile number \u2014 receives the 6-digit confirmation code"
+              },
+              "address": {
+                "type": "object",
+                "properties": {
+                  "street": {
+                    "type": "string",
+                    "minLength": 3
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string",
+                    "minLength": 2
+                  },
+                  "state": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 2,
+                    "default": "MA"
+                  },
+                  "zip": {
+                    "type": "string",
+                    "minLength": 5
+                  }
+                },
+                "required": [
+                  "street",
+                  "city",
+                  "zip"
+                ],
+                "additionalProperties": false
+              },
+              "email": {
+                "type": "string",
+                "format": "email"
+              },
+              "notes": {
+                "type": "string",
+                "maxLength": 2000,
+                "description": "Issue description / anything the technician should know"
+              },
+              "promotion_review_requested": {
+                "type": "boolean",
+                "default": false
+              },
+              "referral_code": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "confirmed": {
+                "type": "boolean",
+                "const": true,
+                "description": "True only after the user explicitly asks to start this booking request and send the SMS code"
+              }
+            },
+            "required": [
+              "service",
+              "name",
+              "phone",
+              "address",
+              "confirmed"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        },
+        {
+          "tool": "confirm_booking",
+          "required_arguments": [
+            "booking_id",
+            "code"
+          ],
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "booking_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string",
+                "pattern": "^\\d{6}$"
+              }
+            },
+            "required": [
+              "booking_id",
+              "code"
+            ],
+            "additionalProperties": false,
+            "$schema": "http://json-schema.org/draft-07/schema#"
+          }
+        }
+      ],
+      "required_conversation_gates": [
+        "Ask for service issue and service location.",
+        "Use actual availability results and let the customer choose.",
+        "Collect name, phone and address directly; public MCP cannot retrieve private customer history.",
+        "Obtain explicit permission before request_booking and its SMS send.",
+        "Use booking_id from the actual request result, and only the code the caller supplies.",
+        "Only claim a confirmed appointment when the actual confirmation result has status=confirmed and booked=true."
+      ],
+      "review_status": "migration_plan_not_training_approved",
+      "executed": false,
+      "tool_results_invented": false
+    }
+  ],
+  "exclusions": [
+    "Old private customer lookup and creation tools are not part of this public contract.",
+    "Old booking results and dates are not evidence of current availability or a real booking.",
+    "Do not map direct create_job to a claimed successful booking without SMS confirmation."
+  ],
+  "runtime_requirement": "Models trained on this contract must be served the same public MCP schemas. Existing voice-specific wrappers require an explicit compatible adapter and tests."
+}

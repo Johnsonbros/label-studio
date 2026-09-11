@@ -1,0 +1,44 @@
+# Shared Cory work protocol
+
+Canonical root: `/mnt/user/appdata/company-datasets` (Unraid persistent storage).
+
+- Codex owns ingestion, Label Studio integration, grading, correction workflow, dataset packaging and trainer orchestration.
+- Claude owns the live voice stack, public MCP integration, runtime safeguards and benchmark/promotion evaluation.
+- The owner or dispatcher supplies human reference labels and approves customer-facing model promotion. This document does not authorize a candidate rollout.
+- Claude may append to HANDOFF.md; coordinate ownership before editing other dataset repo files. Public copies must never include transcripts, customer identities, secrets, or private manifests.
+
+## Contracts
+
+`config/call-topic-taxonomy.v1.json` is version 1.0.0 of the shared topic IDs. Primary topic plus secondary topics describe what the caller needs. Workflow, urgency, outcome and error tags are separate axes. No forced inference: use unknown or unclassified when evidence is missing. A service topic can coexist with pricing or booking as a secondary topic. Taxonomy changes require a version bump and a handoff entry before consumers adopt them.
+
+`config/cory_sft_record.schema.json` is an exact pinned copy of the existing cory-public-model schema. Its SHA is recorded in `config/training-contract.json`. No historical training rows are migrated automatically. That legacy schema alone does NOT validate modern tool-call conversations: it requires nonempty string content and does not validate tool-call IDs, arguments or results. The existing tool trace validator remains mandatory. A replacement SFT schema is a separate coordinated versioned change, not an incidental taxonomy edit.
+
+Taxonomy is published for adoption; neither judge nor benchmark is claimed to consume it yet. Five grading categories and topic tagging can use these IDs, but missing evidence must remain unknown. Historical human calls are not graded for lacking today's MCP calls.
+
+## Cooperative claims
+
+Use `python3 scripts/resource_claim.py show` before any resource change.
+
+Acquire: `python3 scripts/resource_claim.py acquire --resource gpu-window --owner claude --intent 'Measured transcription benchmark; no customer routing change'`
+
+Release with the returned ID: `python3 scripts/resource_claim.py release --owner claude --claim-id ID`
+
+`gpu-window` conflicts with `cory-voice`; identical resources conflict. Label Studio and dataset-pipeline changes have separate claims. These claims serialize cooperating operators using an OS file lock. They do not prevent arbitrary docker commands, and current cron/trainer launchers do not yet consult them. Launcher integration is required before calling this enforced scheduling. Inspect live processes, GPU usage and active calls even after acquiring a claim.
+
+Claims never automatically expire: an elapsed timer does not prove a GPU job stopped. The acquiring owner releases only after the operation ends and checks pass. An abandoned claim requires reconciliation with the actual running job and coordination with its owner; do not silently overwrite it. State lives in `pipeline-state/coordination/claims.json`, not git.
+
+Append handoffs atomically: `python3 scripts/resource_claim.py handoff --owner claude --note 'Changed: ... Deployed: ... Validation: ... Next: ...'`
+
+No simultaneous restarts. A GPU window requires a measured duration estimate and an idle speech lane; plan customer overflow before any voice downtime. The CPU archive pilot currently needs no GPU window.
+
+## Dual-board rule (2026-09-11)
+
+For GPU or voice operations, honor BOTH this repo's claim utility and `/usr/local/bin/whos-working`. Use the same session-specific owner and identical intent on both. Check both `gpu-window` and `cory-voice` on the server-wide board because that board does not implement the repo's cross-resource conflict.
+
+Sequence: inspect both boards and actual running jobs; acquire the repo claim; recheck the server-wide scopes; claim the relevant scope on whos-working; recheck both scopes for other holders; only then start work. If any check fails, release only your newly acquired claims and do not start. Release both only after completion and validation. Two boards are not a distributed atomic lock; a noncooperating launcher can still race this procedure.
+
+Commands: `whos-working check gpu-window SESSION_ID`, `whos-working check cory-voice SESSION_ID`, `whos-working claim RESOURCE SESSION_ID INTENT`, and `whos-working release RESOURCE SESSION_ID`.
+
+Verified installed behavior: only ship lanes are exclusive on whos-working; GPU/voice claim calls can succeed while warning of another holder. Never interpret claim exit status alone as exclusivity. Claims disappear from its active view after 7200 seconds. For a long operation, its owner must refresh the same claim well before that deadline (e.g. every 30 minutes), while holding the non-expiring repo claim. Refresh integration is not implemented here yet. A stale server-wide claim is never proof that the process ended.
+
+Bulk transcription proposal: base.en CPU output is triage-only pending accuracy review, with selective stronger-model retranscription for reviewed examples. Do not assume linear scaling from one to four threads, or that large-v3 finishes in a few hours. Benchmark representative short, medium and long calls, then budget using measured throughput and headroom. Keep bulk triage transcripts outside Label Studio until selected for review; never auto-import the entire archive into the human queue.

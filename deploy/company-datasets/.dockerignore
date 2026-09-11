@@ -1,0 +1,7 @@
+.env
+**/.env
+state
+data
+exports
+backups
+**/__pycache__

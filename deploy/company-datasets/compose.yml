@@ -1,0 +1,107 @@
+name: company-datasets
+services:
+  label-studio:
+    image: heartexlabs/label-studio:1.23.0
+    container_name: company-label-studio
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8895:8080"
+      - "100.98.157.62:8895:8080"
+    volumes:
+      - ./data:/label-studio/data
+      - /mnt/user/appdata/hcp-calls:/recordings/hcp:ro
+      - ./pipeline-state/media:/recordings/daily:ro
+    networks: [default, shared-services]
+    cpus: 2.0
+    mem_limit: 8g
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
+  dataset-backup:
+    image: python:3.13-slim
+    container_name: company-dataset-backup
+    restart: unless-stopped
+    network_mode: none
+    command: ["python", "-u", "/dataset/scripts/backup_loop.py"]
+    volumes:
+      - ./data:/dataset/data:ro
+      - ./backups:/dataset/backups
+      - ./scripts:/dataset/scripts:ro
+    cpus: 0.25
+    mem_limit: 128m
+    security_opt:
+      - no-new-privileges:true
+
+  dataset-gate:
+    build: ./otp-gate
+    image: company-dataset-gate:20260910
+    container_name: company-dataset-gate
+    restart: unless-stopped
+    env_file: ./otp-gate/.env
+    networks:
+      - default
+      - shared-services
+    cpus: 0.5
+    mem_limit: 256m
+    security_opt:
+      - no-new-privileges:true
+  dataset-pipeline:
+    build:
+      context: .
+      dockerfile: pipeline/Dockerfile
+    image: company-dataset-pipeline:20260910
+    container_name: company-dataset-pipeline
+    restart: unless-stopped
+    env_file: ./pipeline/.env
+    volumes:
+      - ./pipeline-state:/state
+      - /mnt/user/appdata/hcp-calls:/archive:ro
+    networks: [default, shared-services]
+    cpus: 2.0
+    mem_limit: 4g
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 30s
+      retries: 3
+
+  label-studio-mcp:
+    image: company-label-studio-mcp:20260910
+    container_name: company-label-studio-mcp
+    restart: unless-stopped
+    entrypoint: [sleep, infinity]
+    env_file: ./mcp/.env
+    volumes:
+      - ./data:/dataset/data:ro
+    networks: [default]
+    cpus: 0.5
+    mem_limit: 512m
+    security_opt: [no-new-privileges:true]
+
+  dataset-trainer:
+    image: company-dataset-trainer:sft-v2-20260911
+    container_name: company-dataset-trainer
+    restart: unless-stopped
+    runtime: nvidia
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      HF_HOME: /state/hf-cache
+    volumes:
+      - ./pipeline-state:/state
+    networks: [default]
+    cpus: 4.0
+    mem_limit: 20g
+    shm_size: 2g
+    security_opt: [no-new-privileges:true]
+
+networks:
+  shared-services:
+    external: true

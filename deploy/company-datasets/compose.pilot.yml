@@ -1,0 +1,22 @@
+name: company-datasets
+services:
+  archive-pilot:
+    image: company-dataset-pipeline:20260910
+    container_name: company-dataset-pilot
+    command: [python, -u, /app/pilot_batch.py]
+    restart: "on-failure:3"
+    env_file: ./pipeline/.env
+    environment:
+      PYTHONPATH: /app
+    volumes:
+      - ./pipeline-state:/state
+      - /mnt/user/appdata/hcp-calls:/archive:ro
+      - ./scripts/pilot_batch.py:/app/pilot_batch.py:ro
+    networks: [default]
+    cpus: 1.0
+    mem_limit: 2g
+    security_opt: [no-new-privileges:true]
+networks:
+  default:
+    external: true
+    name: company-datasets_default
