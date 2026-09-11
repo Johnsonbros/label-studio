@@ -5,10 +5,18 @@ import torch
 from transformers import AutoTokenizer,AutoModelForCausalLM,BitsAndBytesConfig,Trainer,TrainingArguments
 from peft import LoraConfig,get_peft_model,prepare_model_for_kbit_training
 
-def load(path):
+def load(path, purpose="train"):
+    from sft_v2 import validate_record
     rows=[json.loads(x) for x in Path(path).read_text().splitlines() if x.strip()]
     if not rows:raise ValueError('Empty dataset')
-    for r in rows:
+    if len({r.get('schema','legacy') for r in rows})!=1:raise ValueError('Mixed schema versions in dataset')
+    for i,r in enumerate(rows):
+        if 'schema' in r or 'provenance' in r:
+            if r.get('schema')!='cory_sft_record/2.0':raise ValueError('Unknown or missing record schema')
+            if r.get('channel')!='phone':raise ValueError('This trainer is configured for phone records')
+            contract=json.loads(Path('/app/public-mcp-v1-candidate.json').read_text())
+            r=validate_record(r,contract,purpose=purpose,receipt_root='/state/reviewed-tool-receipts')
+            rows[i]=r
         if r.get('lane')!='cory_public' or r.get('channel') not in ['phone','phone_tool']:raise ValueError('Wrong training lane')
         if r['channel']=='phone_tool':
             from tool_contracts import validate_trace,contract_hash
@@ -25,7 +33,7 @@ def tokenize(tokenizer,rows):
             for call in message.get('tool_calls',[]):
                 args=call['function']['arguments']
                 if isinstance(args,str):call['function']['arguments']=json.loads(args)
-        kwargs={'tools':[{'type':'function','function':{'name':t['name'],'description':t.get('description',''),'parameters':t['inputSchema']}} for t in row['tools']]} if row.get('tools') else {}
+        kwargs={'tools':[{'type':'function','function':{'name':t['name'],'description':t.get('description',''),'parameters':t['inputSchema']}} for t in row['tools'] if 'tools_available' not in row or t['name'] in row['tools_available']]} if row.get('tools') else {}
         # Supervise every assistant response, including tool calls, never tool results.
         for index,message in enumerate(messages):
             if message['role']!='assistant':continue
@@ -43,7 +51,10 @@ def main():
     p=argparse.ArgumentParser()
     for n in ['model','data','eval-data','output']:p.add_argument('--'+n,required=True)
     a=p.parse_args();out=Path(a.output)
-    train=load(a.data);evaluation=load(a.eval_data)
+    train=load(a.data,purpose="train");evaluation=load(a.eval_data,purpose="eval")
+    from sft_v2 import assert_disjoint
+    assert_disjoint(train,evaluation)
+    if train[0].get("schema","legacy")!=evaluation[0].get("schema","legacy"):raise ValueError("Train/eval schema versions differ")
     if {x['source_id'] for x in train}&{x['source_id'] for x in evaluation}:raise ValueError('Train/eval leakage')
     tokenizer=AutoTokenizer.from_pretrained(a.model,trust_remote_code=False)
     tokenizer.pad_token=tokenizer.eos_token
