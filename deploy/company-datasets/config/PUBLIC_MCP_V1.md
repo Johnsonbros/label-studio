@@ -62,6 +62,11 @@ review/revalidation when its snapshot changes; that is not a model training run.
 4. Pin each released model to its base-model/tokenizer version, serving tool
    contract, system prompt, dataset revision and evaluation results.
 
-The monitor is installed in the dataset service; it does not yet block a TJB server
-deployment in TJB's CI. Moving the same compatibility gate into that repository's
-protected Preview workflow remains required for an enforced server release freeze.
+The monitor is installed in the dataset service. TJB PR #1384 merged the matching
+baseline and a real MCP tools/list compatibility test into protected Preview on
+2026-09-10 after all seven required checks passed. The existing integration-test
+job now checks tool names, input/output schemas and safety annotations against v1.
+This enforces structural compatibility in Preview CI; the behavioral and serving
+interface gates above still apply.
+
+TJB change: https://git.aisyncservices.com/johnsonbros/johnsonbros/pulls/1384
