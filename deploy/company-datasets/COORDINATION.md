@@ -30,3 +30,15 @@ Claims never automatically expire: an elapsed timer does not prove a GPU job sto
 Append handoffs atomically: `python3 scripts/resource_claim.py handoff --owner claude --note 'Changed: ... Deployed: ... Validation: ... Next: ...'`
 
 No simultaneous restarts. A GPU window requires a measured duration estimate and an idle speech lane; plan customer overflow before any voice downtime. The CPU archive pilot currently needs no GPU window.
+
+## Dual-board rule (2026-09-11)
+
+For GPU or voice operations, honor BOTH this repo's claim utility and `/usr/local/bin/whos-working`. Use the same session-specific owner and identical intent on both. Check both `gpu-window` and `cory-voice` on the server-wide board because that board does not implement the repo's cross-resource conflict.
+
+Sequence: inspect both boards and actual running jobs; acquire the repo claim; recheck the server-wide scopes; claim the relevant scope on whos-working; recheck both scopes for other holders; only then start work. If any check fails, release only your newly acquired claims and do not start. Release both only after completion and validation. Two boards are not a distributed atomic lock; a noncooperating launcher can still race this procedure.
+
+Commands: `whos-working check gpu-window SESSION_ID`, `whos-working check cory-voice SESSION_ID`, `whos-working claim RESOURCE SESSION_ID INTENT`, and `whos-working release RESOURCE SESSION_ID`.
+
+Verified installed behavior: only ship lanes are exclusive on whos-working; GPU/voice claim calls can succeed while warning of another holder. Never interpret claim exit status alone as exclusivity. Claims disappear from its active view after 7200 seconds. For a long operation, its owner must refresh the same claim well before that deadline (e.g. every 30 minutes), while holding the non-expiring repo claim. Refresh integration is not implemented here yet. A stale server-wide claim is never proof that the process ended.
+
+Bulk transcription proposal: base.en CPU output is triage-only pending accuracy review, with selective stronger-model retranscription for reviewed examples. Do not assume linear scaling from one to four threads, or that large-v3 finishes in a few hours. Benchmark representative short, medium and long calls, then budget using measured throughput and headroom. Keep bulk triage transcripts outside Label Studio until selected for review; never auto-import the entire archive into the human queue.
